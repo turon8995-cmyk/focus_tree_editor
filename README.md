@@ -1,3 +1,13 @@
+<!--
+To the extent possible under law, the author(s) have dedicated all
+copyright and related and neighboring rights to this software to the
+public domain worldwide. This software is distributed without any
+warranty.
+
+You should have received a copy of the CC0 Public Domain Dedication
+along with this software. If not, see
+<http://creativecommons.org/publicdomain/zero/1.0/>.
+-->
 # Focus Tree Editor（国策树编辑器）
 
 Godot 4 的编辑器插件，用来做《钢铁雄心 4》风格的国策树：**自由拖拽**的画布、有向前置连线、任一前置组、互斥关系、完成效果与变量、运行时解锁判定与存档。
