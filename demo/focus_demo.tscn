@@ -1,0 +1,113 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://addons/focus_tree_editor/demo/demo_main.gd" id="1_demo"]
+[ext_resource type="Script" path="res://addons/focus_tree_editor/runtime/focus_tree_manager.gd" id="2_manager"]
+[ext_resource type="Script" path="res://addons/focus_tree_editor/runtime/focus_tree_ui.gd" id="3_tree_ui"]
+
+[node name="FocusDemo" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_demo")
+
+[node name="Background" type="ColorRect" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.0666667, 0.0705882, 0.0862745, 1)
+
+[node name="Title" type="Label" parent="."]
+offset_left = 24.0
+offset_top = 14.0
+offset_right = 624.0
+offset_bottom = 48.0
+theme_override_colors/font_color = Color(0.93, 0.9, 0.82, 1)
+theme_override_font_sizes/font_size = 24
+text = "国策树演示"
+
+[node name="Hint" type="Label" parent="."]
+offset_left = 24.0
+offset_top = 50.0
+offset_right = 900.0
+offset_bottom = 74.0
+theme_override_colors/font_color = Color(0.62, 0.63, 0.7, 1)
+theme_override_font_sizes/font_size = 13
+text = "金色边框 = 可研究，黄色 = 进行中，绿色 = 已完成，灰色 = 锁定。"
+
+[node name="Stats" type="Label" parent="."]
+offset_left = 24.0
+offset_top = 74.0
+offset_right = 900.0
+offset_bottom = 98.0
+theme_override_colors/font_color = Color(0.75, 0.78, 0.85, 1)
+theme_override_font_sizes/font_size = 13
+text = "政治点 0"
+
+[node name="SpeedLabel" type="Label" parent="."]
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -280.0
+offset_top = 56.0
+offset_right = -24.0
+offset_bottom = 76.0
+grow_horizontal = 0
+theme_override_colors/font_color = Color(0.6, 0.6, 0.68, 1)
+theme_override_font_sizes/font_size = 12
+text = "时间流速：1 天 = 0.40 秒"
+horizontal_alignment = 2
+
+[node name="SpeedSlider" type="HSlider" parent="."]
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -280.0
+offset_top = 78.0
+offset_right = -24.0
+offset_bottom = 96.0
+grow_horizontal = 0
+min_value = 0.05
+max_value = 2.0
+step = 0.05
+value = 0.4
+
+[node name="ResetButton" type="Button" parent="."]
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -178.0
+offset_top = 16.0
+offset_right = -24.0
+offset_bottom = 46.0
+grow_horizontal = 0
+text = "重置进度"
+
+[node name="FocusTreeManager" type="Node" parent="."]
+script = ExtResource("2_manager")
+tree_path = "res://addons/focus_tree_editor/demo/example_focus_tree.tres"
+seconds_per_day = 0.4
+
+[node name="FocusTreeCanvas" type="Control" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 12.0
+offset_top = 104.0
+offset_right = -12.0
+offset_bottom = -52.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("3_tree_ui")
+
+[node name="Status" type="Label" parent="."]
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = -44.0
+offset_right = -24.0
+offset_bottom = -14.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.83, 0.83, 0.87, 1)
+theme_override_font_sizes/font_size = 14
+text = "就绪。"
