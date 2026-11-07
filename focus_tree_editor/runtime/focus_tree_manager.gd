@@ -44,8 +44,10 @@ signal focus_effect_triggered(focus_id: String, effect: String)
 ## 变量变化（做 HUD 时很方便）。
 signal variable_changed(variable_key: String, value: int)
 
-## 插件自带的变量表路径（搬家/改名后可以自己改 variables_path）。
-const DEFAULT_VARIABLES_PATH := "res://addons/focus_tree_editor/variables.json"
+## 项目自己的变量表（编辑器里「变量表」面板默认写这个文件）。
+const PROJECT_VARIABLES_PATH := "res://focus_tree_variables.json"
+## 插件自带的模板（项目还没建变量表时兜底用）。
+const TEMPLATE_VARIABLES_PATH := "res://addons/focus_tree_editor/variables.json"
 ## 变量表读不到时的兜底，保证没有 JSON 也能跑。
 const FALLBACK_VARIABLES := {
 	"political_power": {"default": 0, "label": "政治点"},
@@ -82,8 +84,9 @@ var condition_resolver: Callable = Callable()
 ## 自定义效果解析器：func(effect: String, focus_id: String)，优先于内置语法。
 var effect_resolver: Callable = Callable()
 
-## 变量表 JSON 的路径（默认用插件自带的那份；项目里想改就指向自己的文件）。
-@export_file("*.json") var variables_path: String = DEFAULT_VARIABLES_PATH
+## 变量表路径：默认用项目自己的 focus_tree_variables.json；
+## 不想建就直接用插件模板（编辑器里的「变量表」面板可以一键生成）。
+@export_file("*.json") var variables_path: String = PROJECT_VARIABLES_PATH
 
 ## 全局变量（当前值）。效果里的 "政治点 / 工厂 / 稳定度" 都在这里读写，游戏直接读它。
 var variables: Dictionary = {}
@@ -103,6 +106,7 @@ var _effect_depth := 0
 
 
 func _ready() -> void:
+	add_to_group("focus_tree_manager")   # FocusTreeView 靠这个组自动找到管理器
 	load_variable_definitions()
 	if tree == null and not tree_path.is_empty():
 		load_tree(tree_path)
@@ -331,7 +335,8 @@ func complete_focus(focus_id: String) -> void:
 # 变量表（JSON） / 变量 / 标记
 # ---------------------------------------------------------------------------
 
-## 读取变量表 JSON。path 为空时用 variables_path；读不到就退回内置默认值。
+## 读取变量表 JSON。path 为空时用 variables_path；
+## 顺序：指定路径 → variables_path → 插件模板 → 内置默认值。
 ## JSON 两种写法都支持：
 ##   { "political_power": { "default": 0, "label": "政治点" } }
 ##   { "political_power": 0 }
@@ -341,8 +346,10 @@ func load_variable_definitions(path: String = "") -> bool:
 		candidates.append(path)
 	if not variables_path.is_empty():
 		candidates.append(variables_path)
-	if not candidates.has(DEFAULT_VARIABLES_PATH):
-		candidates.append(DEFAULT_VARIABLES_PATH)
+	if not candidates.has(PROJECT_VARIABLES_PATH):
+		candidates.append(PROJECT_VARIABLES_PATH)
+	if not candidates.has(TEMPLATE_VARIABLES_PATH):
+		candidates.append(TEMPLATE_VARIABLES_PATH)
 
 	for candidate in candidates:
 		if not FileAccess.file_exists(candidate):

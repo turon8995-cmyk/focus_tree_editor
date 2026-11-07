@@ -42,6 +42,10 @@ var _icon_target: FocusNodeData = null
 var _context_position := Vector2.ZERO
 ## 工具栏「吸附」开关：打开后拖拽结束会吸附到 SNAP_STEP 的格点。
 var _snap_enabled := false
+## 自定义字段定义（来自项目根目录的 focus_tree_custom_fields.json）。
+var _custom_fields: Array = []
+var _variables_window: Window
+var _variables_editor: FocusVariablesEditor
 
 ## 按顺序尝试的系统字体；只有当宿主主题字体画不出中文时才启用。
 const CJK_FONT_NAMES := [
@@ -74,11 +78,47 @@ var _context_menu: PopupMenu
 
 func _ready() -> void:
 	_ensure_cjk_font()
+	_reload_custom_fields()
 	_build_ui()
 	_connect_graph_signals()
 	new_tree()
 	resized.connect(_apply_default_split)
 	_apply_default_split.call_deferred()
+
+
+## 重新读取项目里的自定义字段定义（focus_tree_custom_fields.json）。
+func _reload_custom_fields() -> void:
+	_custom_fields = FocusFieldSchema.load_fields()
+
+
+## 打开变量表可视化编辑器（写项目自己的 focus_tree_variables.json）。
+func _open_variables_editor() -> void:
+	if _variables_window == null:
+		_variables_window = Window.new()
+		_variables_window.title = "变量表"
+		_variables_window.min_size = Vector2i(760, 520)
+		_variables_window.size = Vector2i(840, 560)
+		_variables_window.visible = false
+		_variables_window.close_requested.connect(func() -> void: _variables_window.hide())
+
+		var margin := MarginContainer.new()
+		margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		margin.add_theme_constant_override("margin_left", 10)
+		margin.add_theme_constant_override("margin_right", 10)
+		margin.add_theme_constant_override("margin_top", 10)
+		margin.add_theme_constant_override("margin_bottom", 10)
+		_variables_window.add_child(margin)
+
+		_variables_editor = FocusVariablesEditor.new()
+		_variables_editor.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		_variables_editor.saved.connect(func(path: String) -> void:
+			_status("变量表已保存：%s（游戏里用 FocusTreeManager 读同一个文件）" % path))
+		margin.add_child(_variables_editor)
+		add_child(_variables_window)
+
+	_variables_editor.reload()
+	if _can_popup():
+		_variables_window.popup_centered()
 
 
 ## 第一次拿到真实宽度时把 62% 分给画布（Dock 窄的时候画布优先），之后用户手动拖分栏就不再干预。
@@ -208,6 +248,12 @@ func add_focus(at_position: Vector2 = Vector2.INF) -> FocusNodeData:
 	data.title = "新国策"
 	data.days = DEFAULT_DAYS
 	data.position = target
+	# 自定义字段先填上默认值，面板里就能直接看到
+	for field in _custom_fields:
+		var field_key := String(field.get("key", ""))
+		if field_key.is_empty() or data.custom.has(field_key):
+			continue
+		data.custom[field_key] = field.get("default", FocusFieldSchema.default_for(String(field.get("type", "string"))))
 	tree_data.nodes.append(data)
 
 	var node := FocusGraphNode.new()
@@ -431,6 +477,7 @@ func _build_toolbar() -> HFlowContainer:
 	bar.add_child(_make_button("删除国策", _on_delete_pressed, "删除选中的国策"))
 	bar.add_child(_make_button("自动整理", auto_arrange, "按依赖深度重新排列国策"))
 	bar.add_child(_make_button("检查", _on_validate_pressed, "检查 ID、引用、依赖环与节点重叠"))
+	bar.add_child(_make_button("变量表", _open_variables_editor, "可视化编辑项目变量表（focus_tree_variables.json）"))
 
 	var snap_toggle := CheckButton.new()
 	snap_toggle.text = "吸附"
@@ -613,6 +660,7 @@ func _connect_graph_signals() -> void:
 func _apply_tree_data(data: FocusTreeData, path: String) -> void:
 	tree_data = data
 	current_path = path
+	_reload_custom_fields()
 	_sanitize_tree()
 	_rebuild_graph_from_data()
 	_rebuild_properties()
@@ -1144,12 +1192,61 @@ func _rebuild_properties() -> void:
 		_assign_lines(data, "effects", effects_edit.text))
 	_add_hint("内置支持 political_power（或 pp）的加减；其它写法会通过 FocusTreeManager.focus_effect_triggered 信号 / effect_resolver 交给游戏自己处理。")
 
+	# 自定义字段：由项目根目录的 focus_tree_custom_fields.json 定义
+	if not _custom_fields.is_empty():
+		_section("自定义字段")
+		for field in _custom_fields:
+			_add_custom_field_editor(data, field)
+		_add_hint("字段定义在 res://focus_tree_custom_fields.json；值存在 FocusNodeData.custom 里。")
+
 	var delete_button := Button.new()
 	delete_button.text = "删除此国策"
 	delete_button.pressed.connect(func() -> void: delete_focus(data.id))
 	_props_box.add_child(delete_button)
 
 	_updating_ui = false
+
+
+## 按 FocusFieldSchema 的定义渲染一个自定义字段控件。
+func _add_custom_field_editor(data: FocusNodeData, field: Dictionary) -> void:
+	var key := String(field.get("key", ""))
+	if key.is_empty():
+		return
+	var label_text := String(field.get("label", key))
+	var field_type := String(field.get("type", "string"))
+	var value: Variant = data.custom.get(key, field.get("default", FocusFieldSchema.default_for(field_type)))
+
+	match field_type:
+		"bool":
+			var row := _row(label_text)
+			var check := CheckBox.new()
+			check.button_pressed = bool(value)
+			check.toggled.connect(func(pressed: bool) -> void:
+				_set_custom_value(data, key, pressed))
+			row.add_child(check)
+		"int":
+			var spin := _spin_field(label_text, float(int(value)), -999999.0, 999999.0, 1.0)
+			spin.value_changed.connect(func(new_value: float) -> void:
+				_set_custom_value(data, key, int(new_value)))
+		"float":
+			var spin := _spin_field(label_text, float(value), -999999.0, 999999.0, 0.1)
+			spin.value_changed.connect(func(new_value: float) -> void:
+				_set_custom_value(data, key, new_value))
+		"text":
+			var edit := _text_field(label_text, String(value), 56.0)
+			edit.text_changed.connect(func() -> void:
+				_set_custom_value(data, key, edit.text))
+		_:
+			var edit := _line_field(label_text, String(value))
+			edit.text_changed.connect(func(text: String) -> void:
+				_set_custom_value(data, key, text))
+
+
+func _set_custom_value(data: FocusNodeData, key: String, value: Variant) -> void:
+	if _updating_ui or data == null:
+		return
+	data.custom[key] = value
+	_mark_dirty()
 
 
 func _section(text: String) -> void:
@@ -1209,13 +1306,13 @@ func _text_field(label_text: String, value: String, height: float) -> TextEdit:
 	return edit
 
 
-func _spin_field(label_text: String, value: int, min_value: int, max_value: int, step: float) -> SpinBox:
+func _spin_field(label_text: String, value: float, min_value: float, max_value: float, step: float) -> SpinBox:
 	var row := _row(label_text)
 	var spin := SpinBox.new()
 	spin.min_value = min_value
 	spin.max_value = max_value
 	spin.step = step
-	spin.rounded = true
+	spin.rounded = is_equal_approx(step, roundf(step))
 	spin.value = value
 	spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(spin)

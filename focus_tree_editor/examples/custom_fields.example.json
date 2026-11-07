@@ -1,0 +1,9 @@
+{
+  "_说明": "把这行文件复制到项目根目录并改名为 focus_tree_custom_fields.json，编辑器里的「自定义字段」区就会按这里的定义生成控件。",
+  "fields": [
+    { "key": "faction", "label": "派系", "type": "string", "default": "" },
+    { "key": "ai_weight", "label": "AI 权重", "type": "int", "default": 10 },
+    { "key": "note", "label": "备注", "type": "text", "default": "" },
+    { "key": "enabled", "label": "启用", "type": "bool", "default": true }
+  ]
+}

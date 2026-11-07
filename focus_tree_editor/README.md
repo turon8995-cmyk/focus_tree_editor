@@ -9,22 +9,29 @@ Godot 4 的编辑器插件，用来做《钢铁雄心 4》风格的国策树：*
 ```
 addons/focus_tree_editor/
 ├── plugin.cfg / plugin.gd        # 插件入口（Dock + 弹出窗口 + 工具栏按钮）
-├── focus_node_data.gd            # 单节点数据
+├── focus_node_data.gd            # 单节点数据（含 custom 自定义字典）
 ├── focus_tree_data.gd            # 整棵树容器 + 校验
 ├── focus_graph_node.gd           # 画布节点
 ├── focus_graph_edit.gd           # 画布（互斥实线 / 任一前置虚线）
 ├── focus_tree_editor.gd          # 编辑器主面板
-├── variables.json                # 变量表（默认值 + 显示名）
+├── focus_variables_editor.gd     # 「变量表」可视化编辑窗口
+├── focus_field_schema.gd         # 自定义字段定义（读 JSON）
+├── variables.json                # 变量表模板（项目还没建自己的时会用它）
 ├── runtime/
 │   ├── focus_tree_manager.gd     # 运行时：解锁 / 进度 / 效果 / 存档
-│   └── focus_tree_ui.gd          # 示例运行时 UI
+│   ├── focus_tree_view.tscn/.gd  # 运行时界面：放一个节点，show()/hide()
+│   └── focus_card.tscn/.gd       # 国策卡片（可编辑的场景）
 ├── demo/                         # 可直接运行的示例（场景 + 树枝 + 脚本）
-├── examples/build_example_tree.gd
+├── examples/
+│   ├── build_example_tree.gd
+│   └── custom_fields.example.json
 ├── docs/                         # 截图
 └── README.md
 ```
 
-整包拷进任意项目即可，不需要改项目设置（除了启用插件）。
+整包拷进任意项目即可，不需要改项目设置（除了启用插件）。项目侧只有两个**可选**文件：
+`res://focus_tree_variables.json`（变量表）和 `res://focus_tree_custom_fields.json`（自定义字段），
+不建也能跑（变量表用插件模板，自定义字段区隐藏）。
 
 ---
 
@@ -75,6 +82,19 @@ manager.start_focus("focus_001")           # 之后按秒自动推进
 
 默认 **1 秒 = 1 天**，70 天的国策需要 70 秒；想快一点改 `manager.seconds_per_day = 0.2`，想接游戏自己的时钟见第七章。
 
+### 4) 运行时界面（一个节点）
+
+把 `runtime/focus_tree_view.tscn` 实例化到场景里（建议放 CanvasLayer 下），它会自动找到场景里的 `FocusTreeManager`，然后：
+
+```gdscript
+@onready var focus_view: FocusTreeView = $FocusTreeView
+
+func _ready() -> void:
+	focus_view.open()      # 想关就 focus_view.close()，或者直接 show()/hide()
+```
+
+卡片是真实场景节点（`focus_card.tscn`），要换外观直接编辑那个场景，不用改脚本。
+
 ---
 
 ## 二、操作表
@@ -113,6 +133,7 @@ manager.start_focus("focus_001")           # 之后按秒自动推进
 | `allow_branch` | `Array[String]` | 分支显示条件表达式 |
 | `effects` | `Array[String]` | 完成效果（第五章） |
 | `position` | `Vector2` | 画布像素坐标，**唯一的位置来源** |
+| `custom` | `Dictionary` | 项目自定义字段的值（见 5.5） |
 
 ### FocusTreeData（`focus_tree_data.gd`）
 
@@ -163,29 +184,33 @@ nodes = Array[ExtResource("1_glutk")]([SubResource("Resource_tw2is")])
 
 ## 五、完成效果与变量（重点）
 
-### 5.1 变量表（JSON）
+### 5.1 变量表（可视化编辑）
 
-变量的**定义**（key、默认值、显示名）放在插件自带的 JSON 里：
+变量表放在**项目自己**的文件里：
 
 ```
-addons/focus_tree_editor/variables.json
+res://focus_tree_variables.json
 ```
+
+编辑器面板工具栏点 **变量表** 打开可视化编辑窗口：每行一个变量（key / 默认值 / 显示名），
+可以增删改，点 **保存** 直接写回上面那个文件。项目里还没有这个文件时，窗口会先把插件模板
+（`addons/focus_tree_editor/variables.json`）载进来，保存后生成项目自己的版本。
+
+文件格式（也支持简写 `"army_experience": 0`，`_` 开头的键当注释忽略）：
 
 ```json
 {
   "political_power": { "default": 0,  "label": "政治点" },
   "stability":       { "default": 50, "label": "稳定度" },
-  "war_support":     { "default": 50, "label": "战争支持度" },
-  "civilian_factories": { "default": 0, "label": "民用工厂" },
-  "military_factories": { "default": 0, "label": "军用工厂" },
-  "manpower":        { "default": 0,  "label": "人力" }
+  "army_experience": { "default": 0,  "label": "陆军经验" }
 }
 ```
 
-- 直接改这个文件就能加变量 / 改默认值 / 改显示名，**不用改代码**；也可以写成简写 `"army_experience": 0`；
-- 以 `_` 开头的键当注释忽略（例如 `"_说明"`）；
-- 想放到项目自己的路径：在管理器的 `variables_path` 里填 `res://你的/变量表.json`；
-- 文件缺失或写坏不会崩：自动退回内置默认变量并 `push_warning`（所以“装上就能用”）。
+读取顺序：`FocusTreeManager.variables_path`（默认就是 `res://focus_tree_variables.json`）
+→ 插件模板 → 内置默认值。哪一步都读不到也不会崩，只会 `push_warning`。
+
+> 想做"不同国家/不同剧本"的变量表：把 `variables_path` 指到别的 JSON，或者在运行时
+> `load_variable_definitions("res://xxx.json")` 切换。
 
 运行时值存在 `FocusTreeManager.variables` 里，游戏代码直接读写：
 
@@ -195,7 +220,7 @@ manager.set_variable("political_power", 200)   # 会发 variable_changed 信号
 manager.reset_variables()                      # 全部恢复成 JSON 里的默认值
 ```
 
-`add_variable()` 也可以运行时补变量，但**不会写回 JSON**（想长期维护请加进 JSON）。
+`add_variable()` 也可以运行时补变量，但**不会写回 JSON**（想长期维护请用「变量表」窗口）。
 
 ### 5.2 效果怎么写
 
@@ -274,6 +299,38 @@ army_experience += 25
 set_flag:rearmed
 ```
 
+### 5.5 自定义字段（每个项目自己的字段）
+
+不同项目想给国策加自己的字段（派系、AI 权重、分类、备注…）时，不用改插件代码：
+在项目根目录放一个 `res://focus_tree_custom_fields.json`（可参考
+`addons/focus_tree_editor/examples/custom_fields.example.json`）：
+
+```json
+{
+  "fields": [
+    { "key": "faction",   "label": "派系",    "type": "string", "default": "" },
+    { "key": "ai_weight", "label": "AI 权重", "type": "int",    "default": 10 },
+    { "key": "note",      "label": "备注",    "type": "text",   "default": "" },
+    { "key": "enabled",   "label": "启用",    "type": "bool",   "default": true }
+  ]
+}
+```
+
+- 编辑器右侧属性区会多出「自定义字段」一栏，按 `type` 自动生成控件：`string` 单行、`text` 多行、
+  `int` / `float` 数字框、`bool` 勾选框；
+- 值存在 `FocusNodeData.custom`（`Dictionary`）里，跟着 `.tres` 一起存；
+- 新建国策时会自动填 `default`；
+- 运行时直接读：
+
+```gdscript
+var faction: String = data.custom.get("faction", "")
+var weight: int = int(data.custom.get("ai_weight", 0))
+if bool(data.custom.get("enabled", true)):
+	...
+```
+
+- 字段定义文件不存在时，属性区不显示这一栏（不影响其它功能）；改完 JSON 后重新打开树或重启编辑器即可生效。
+
 ---
 
 ## 六、条件表达式
@@ -349,6 +406,20 @@ manager.advance_days(1.0)          # 每次时间推进时调用
 | `focus_effect_triggered(id, effect)` | 每条效果执行时 |
 | `variable_changed(key, value)` | 变量变化 |
 
+### 7.3 运行时界面（FocusTreeView）
+
+| 成员 | 说明 |
+| --- | --- |
+| `open()` / `close()` / `toggle()` | 构建并显示 / 隐藏 / 切换 |
+| `refresh()` | 换过树或改过节点位置后重建 |
+| `add_header_control(control)` | 往标题栏右侧塞自己的控件（资源条、时间流速…） |
+| `set_status(text)` | 底部状态文字；空串恢复默认提示 |
+| `visible` | 也可以用原生 `show()` / `hide()` |
+| `card_size` / `card_scene` / `tree_title` / `open_on_ready` | 属性 |
+| `manager` | 数据来源；留空会自动找场景里 `focus_tree_manager` 组内的管理器 |
+
+> 建议放在 `CanvasLayer` 下，这样它总在最上层，不会和游戏里的其它 Control 抢层级。
+
 ---
 
 ## 八、存档
@@ -372,26 +443,33 @@ manager.load_state(JSON.parse_string(text))
 
 ## 九、完整示例（demo 场景怎么接的）
 
-`addons/focus_tree_editor/demo/demo_main.gd` 里最关键的三段：
+`addons/focus_tree_editor/demo/demo_main.gd` 里最关键的几段：
 
 ```gdscript
-func _ready() -> void:
-	manager.load_tree("res://addons/focus_tree_editor/demo/example_focus_tree.tres")
-	tree_canvas.manager = manager
-	tree_canvas.rebuild()
+@onready var manager: FocusTreeManager = $FocusTreeManager
+@onready var view: FocusTreeView = $FocusTreeView
+@onready var open_button: Button = $OpenButton
 
-	manager.focus_progress.connect(func(id: String, ratio: float) -> void:
-		status_label.text = "正在研究「%s」：%d%%" % [id, int(ratio * 100)])
-	manager.focus_completed.connect(func(_id: String) -> void:
-		_update_stats())                       # 效果改完变量后刷新 HUD
-	manager.variable_changed.connect(_on_variable_changed)
+func _ready() -> void:
+	if manager.tree == null:
+		manager.load_tree("res://addons/focus_tree_editor/demo/example_focus_tree.tres")
+
+	# 往标题栏塞自己的 HUD（变量、时间流速…）
+	var box := HBoxContainer.new()
+	box.add_child(stats_label)
+	box.add_child(speed_slider)
+	view.add_header_control(box)
+
+	# 关掉面板后可以用自己的按钮再打开
+	open_button.pressed.connect(view.open)
+	manager.variable_changed.connect(_update_stats)
 ```
 
-- 点击国策开始研究：`FocusTreeUI` 内部就是 `manager.start_focus(id)`；
-- 卡片上直接显示标题 + 一两行描述，**鼠标悬停**弹出完整信息（描述、时长、状态、效果、前置/互斥）；
+- 点击国策开始研究：`FocusTreeView` 内部就是 `manager.start_focus(id)`；
+- 卡片是 `focus_card.tscn` 的实例：标题 + 描述 + 天数 + 进度条，**鼠标悬停**弹出完整信息（描述、时长、状态、效果、前置/互斥）；
 - 时间流速滑块改的是 `manager.seconds_per_day`；
 - HUD 上的「政治点 / 稳定度 / 民用工厂」读的是 `manager.get_variable(...)`；
-- 卡片尺寸用 `FocusTreeUI.card_size` 调（默认 240×120），整体会自动缩放适配窗口。
+- 卡片尺寸用 `FocusTreeView.card_size` 调（默认 240×120），整体会自动缩放适配面板。
 
 运行示例：在文件系统里双击打开 `addons/focus_tree_editor/demo/focus_demo.tscn`，按 **F6**（运行当前场景）；或
 
@@ -405,23 +483,27 @@ godot --path <项目> res://addons/focus_tree_editor/demo/focus_demo.tscn
 
 ## 十、二次开发
 
-### 加字段
+### 换运行时界面
 
-1. `focus_node_data.gd` 加 `@export`；
-2. 右侧属性区 `_rebuild_properties()` 里加控件；
-3. `duplicate_data()`、`remove_reference_to()` / `replace_id_references()`（如果是引用类字段）同步；
-4. `FocusGraphNode.refresh()` 决定要不要显示。
-
-### 换运行时 UI
-
-`FocusTreeUI` 是自绘示例，状态取色逻辑在这里：
+`focus_tree_view.tscn` 只负责容器和连线，卡片是 `focus_card.tscn` 的实例：
 
 ```gdscript
 var state := manager.get_focus_state(data.id)   # completed / in_progress / available / locked / hidden
 ```
 
-换成美术资源时，保留 `is_visible` 做分支隐藏、`get_focus_state` 做状态即可。
-画卡片的内容在 `_draw_card()`（标题 / 描述 / 天数 / 进度条），悬停信息在 `_get_tooltip()`，两处一起改就能保持视觉和提示一致。
+- 换外观：直接编辑 `focus_card.tscn`（PanelContainer + Label + ProgressBar），脚本 `focus_card.gd`
+  只在 `setup()` / `apply_state()` 里填内容，不需要改；
+- 换整套 UI：保留 `manager.get_focus_state()` / `is_visible()` 的语义，用你自己的场景重写 `focus_tree_view.gd` 里的 `_rebuild()` 即可；
+- 连线用 `Line2D` / `Polygon2D` 节点画（不是 `_draw`），想换成贴图/粒子都行。
+
+### 加自定义字段
+
+先用 5.5 的 `focus_tree_custom_fields.json`（不改代码）；确实需要新类型或特殊控件时，再按下面的顺序改插件：
+
+1. `focus_node_data.gd` 加 `@export`；
+2. 右侧属性区 `_rebuild_properties()` 里加控件；
+3. `duplicate_data()`、`remove_reference_to()` / `replace_id_references()`（如果是引用类字段）同步；
+4. `FocusGraphNode.refresh()` 决定要不要显示。
 
 ### 导出成 HOI4 的 focus 文本
 
@@ -449,4 +531,4 @@ var state := manager.get_focus_state(data.id)   # completed / in_progress / avai
 - 没接 `EditorUndoRedoManager`，画布内编辑暂无 Ctrl+Z。
 - 内置效果只做变量/标记/直接完成；复杂效果请用 `effect_resolver` 或信号。
 - `allow_branch` 只是隐藏，不会阻止已经被“研究完成”的历史。
-- 运行时 UI 是示例，正式项目建议按 `FocusTreeUI` 的状态色逻辑换成美术资源。
+- 运行时的卡片样式比较素，正式项目可直接编辑 `focus_card.tscn` 换成美术资源。

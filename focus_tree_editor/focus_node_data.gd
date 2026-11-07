@@ -52,6 +52,12 @@ static var _id_regex: RegEx = RegEx.create_from_string(ID_PATTERN)
 ## 画布上的像素位置（自由拖拽，唯一的位置来源）。
 @export var position: Vector2 = Vector2.ZERO
 
+@export_group("自定义")
+## 自定义字段的值（key -> 值）。
+## 字段的 key / 类型 / 显示名由项目根目录的 focus_tree_custom_fields.json 定义，
+## 运行时代码直接读：data.custom.get("faction", "")。
+@export var custom: Dictionary = {}
+
 
 ## id 是否合法（非空、只含字母数字下划线）。
 static func is_valid_id(value: String) -> bool:
@@ -103,6 +109,7 @@ func duplicate_data() -> FocusNodeData:
 	copy.allow_branch = allow_branch.duplicate()
 	copy.effects = effects.duplicate()
 	copy.position = position
+	copy.custom = custom.duplicate(true)
 	return copy
 
 
