@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="FocusTreeData" format=3]
+
+[ext_resource type="Script" path="res://addons/focus_tree_editor/focus_node_data.gd" id="1_otthq"]
+[ext_resource type="Script" path="res://addons/focus_tree_editor/focus_tree_data.gd" id="2_8pvfi"]
+
+[sub_resource type="Resource" id="Resource_fmucs"]
+script = ExtResource("1_otthq")
+id = "focus_001"
+title = "重整军备"
+description = "重建军队，为即将到来的战争做准备。"
+effects = Array[String](["political_power += 100", "civilian_factories += 1"])
+position = Vector2(160, 140)
+
+[sub_resource type="Resource" id="Resource_6pe88"]
+script = ExtResource("1_otthq")
+id = "focus_002"
+title = "军队改革"
+description = "推进军队指挥体系与装备的现代化。"
+days = 90
+prerequisites = Array[String](["focus_001"])
+effects = Array[String](["political_power += 50", "military_factories += 1", "stability += 5"])
+position = Vector2(520, 140)
+
+[resource]
+script = ExtResource("2_8pvfi")
+tree_name = "示例国策树"
+nodes = Array[ExtResource("1_otthq")]([SubResource("Resource_fmucs"), SubResource("Resource_6pe88")])

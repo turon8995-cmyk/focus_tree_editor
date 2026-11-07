@@ -1,0 +1,9 @@
+{
+  "_说明": "国策效果用的变量表：key -> { default: 默认值, label: 显示名 }。改完重新加载游戏/编辑器即可；也可以在 FocusTreeManager 上用 variables_path 指向项目自己的 JSON。",
+  "political_power": { "default": 0, "label": "政治点" },
+  "stability": { "default": 50, "label": "稳定度" },
+  "war_support": { "default": 50, "label": "战争支持度" },
+  "civilian_factories": { "default": 0, "label": "民用工厂" },
+  "military_factories": { "default": 0, "label": "军用工厂" },
+  "manpower": { "default": 0, "label": "人力" }
+}
